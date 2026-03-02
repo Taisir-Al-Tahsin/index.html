@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>YouTube Link Viewer</title>
+  <style>
+    body{font-family:system-ui;margin:24px;max-width:800px}
+    input{width:100%;padding:12px;font-size:16px}
+    button{padding:10px 14px;font-size:16px;margin-top:10px}
+    .card{margin-top:18px;padding:14px;border:1px solid #ddd;border-radius:10px}
+    img{max-width:100%;border-radius:10px}
+    iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:10px}
+    a.btn{display:inline-block;padding:10px 14px;border:1px solid #ddd;border-radius:10px;text-decoration:none;margin-top:12px}
+  </style>
+</head>
+<body>
+  <h2>YouTube Link Viewer (No Download)</h2>
+  <input id="yt" placeholder="https://www.youtube.com/watch?v=..." />
+  <button id="go">Show</button>
+  <div id="out" class="card" style="display:none"></div>
+
+<script>
+  const WORKER_BASE = "https://tfyt.moviehubbd.workers.dev"; // change this
+  const out = document.getElementById("out");
+
+  function extractVideoId(u) {
+    try {
+      const url = new URL(u);
+      if (url.hostname.includes("youtu.be")) return url.pathname.slice(1);
+      if (url.searchParams.get("v")) return url.searchParams.get("v");
+      const parts = url.pathname.split("/");
+      const embedIndex = parts.indexOf("embed");
+      if (embedIndex >= 0 && parts[embedIndex+1]) return parts[embedIndex+1];
+    } catch {}
+    return null;
+  }
+
+  document.getElementById("go").onclick = async () => {
+    const yurl = document.getElementById("yt").value.trim();
+    const vid = extractVideoId(yurl);
+
+    if (!vid) {
+      out.style.display = "block";
+      out.innerHTML = "<b>Invalid YouTube link.</b>";
+      return;
+    }
+
+    const cleanUrl = `https://www.youtube.com/watch?v=${vid}`;
+    out.style.display = "block";
+    out.innerHTML = "Loading...";
+
+    try {
+      const res = await fetch(`${WORKER_BASE}/oembed?url=${encodeURIComponent(cleanUrl)}`);
+      if (!res.ok) throw new Error("oEmbed failed");
+      const data = await res.json();
+
+      out.innerHTML = `
+        <h3 style="margin:0 0 10px 0;">${data.title || "YouTube Video"}</h3>
+        ${data.thumbnail_url ? `<img src="${data.thumbnail_url}" alt="thumbnail"/>` : ""}
+        <div style="margin-top:12px">
+          <iframe src="https://www.youtube.com/embed/${vid}" allowfullscreen></iframe>
+        </div>
+        <a class="btn" href="${cleanUrl}" target="_blank" rel="noopener">Open in YouTube</a>
+      `;
+    } catch (e) {
+      out.innerHTML = "<b>Could not load video info.</b>";
+    }
+  };
+</script>
+</body>
+</html>
